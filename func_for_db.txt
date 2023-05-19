@@ -1,0 +1,94 @@
+-- Процедура для сравнения контрольного числа СНИЛС
+CREATE OR REPLACE procedure check_func(INOUT my_snils VARCHAR(40)) AS $$
+
+	DECLARE snils VARCHAR(14);
+	DECLARE ctrlsum INT;
+	DECLARE sum_ INT;
+	
+BEGIN
+    snils = REPLACE(REPLACE(my_snils,' ',''),'-','');
+ 	IF length(snils) = 11 THEN
+	    sum_ = CAST(SUBSTRING(snils,1,1) AS INT)*9 + CAST(SUBSTRING(snils,2,1) as INT)*8 + CAST(SUBSTRING(snils,3,1) as INT)*7 + CAST(SUBSTRING(snils,4,1) AS INT)*6 + CAST(SUBSTRING(snils,5,1) AS INT)*5 + CAST(SUBSTRING(snils,6,1) AS INT)*4 + CAST(SUBSTRING(snils,7,1) AS INT)*3 + CAST(SUBSTRING(snils,8,1) AS INT)*2 + CAST(SUBSTRING(snils,9,1) AS INT)*1;
+	  	
+		ctrlsum = 
+			CASE 
+				WHEN sum_ < 100 THEN sum_
+				WHEN sum_ = 100 OR sum_ % 100 = 1 THEN 0
+				WHEN sum_ > 101 THEN sum_ % 101
+			END;
+	
+		IF CAST(REVERSE(SUBSTRING(REVERSE(snils),1,2)) AS INT) = ctrlsum
+		THEN my_snils = ctrlsum; --Если проверка пройдена возвращаем контрольную сумму, если проверка не пройдена то 0
+		ELSE 
+			my_snils = 0;
+		    RAISE NOTICE 'Проверка не пройдена!';
+		END IF;
+	ELSE 
+		my_snils = 0;
+		RAISE NOTICE 'Проверка не пройдена (длина СНИЛС не равна 11 символам)!';
+	END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Функция на вход принимает СНИЛС, выполняет проверку СНИЛС, 
+-- в случае успех возращает таблицу из 1 столбца с массивом данных.
+CREATE OR REPLACE FUNCTION get_client(my_snils VARCHAR(40)) 
+    RETURNS TABLE (
+        first_name_ varchar,
+        product_ varchar,
+        value_ numeric(10,2)
+) 
+AS $$
+
+	DECLARE control_numb INT;	
+
+begin
+	
+	CALL check_func(my_snils);
+	control_numb = my_snils; -- Значения контрольного числа СНИЛС которое получаем после проверки из функции
+	
+    RETURN QUERY SELECT
+        first_name,
+        product,
+        value
+    FROM
+        clients c 
+    where c.control_number = control_numb;
+   
+END; $$ 
+LANGUAGE 'plpgsql';
+
+
+select get_client('436 726 772 13') -- Вызов функции
+
+
+-- Анонимный блок для обновления значений в таблице
+DO $$
+DECLARE  my_snils VARCHAR(40) := '436 726 772 13'; -- ЗДЕСЬ ВВОДИТСЯ СНИЛС, можно вводить с пробелами или тире
+DECLARE control_figure INT; --Значение контрольного числа из таблицы
+DECLARE control_numb INT; --После проверки из функции 
+
+begin
+
+	CALL check_func(my_snils);
+	control_numb = my_snils;
+
+	SELECT c.control_number
+	INTO control_figure
+	from clients c 
+	WHERE c.first_name = 'Сидоров';
+
+	IF control_numb = control_figure THEN
+		UPDATE clients SET value=0, date_close = current_date WHERE clients.control_number = control_figure;
+		RAISE NOTICE 'У клиента с контрольным числом СНИЛС = % значения полей обновлены.', control_numb;
+	ELSE 
+		
+		RAISE NOTICE 'Значения контрольного числа СНИЛС не равны.';
+	
+	END IF;
+
+END
+$$;
+
+

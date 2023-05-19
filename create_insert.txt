@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS clients (
+            id INTEGER primary key,
+            first_name VARCHAR(1000) NOT NULL,
+            last_name VARCHAR(1000) NOT NULL,
+            control_number INTEGER not NULL,
+            product VARCHAR(1000) NOT NULL,
+            value NUMERIC(10,2),
+            date_create DATE,   
+            date_close DATE   
+            );
+
+
+insert into clients 
+values (1, 'Сидоров', 'Сидор', '13', 'Депозит', '20500.50', to_date('01.01.2001','DD.MM.YYYY'), null);
+insert into clients 
+values (2, 'Иванов', 'Иван', '90', 'Кредит', '10000.12', to_date('18.05.2023','DD.MM.YYYY'), null);
